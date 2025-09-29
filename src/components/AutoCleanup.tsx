@@ -63,7 +63,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
       
       if (dryRun) {
         toast.success(
-          `Preview complete: Found ${totalDeleted} artifacts (${formatBytes(totalSize * 1024 * 1024)}) across ${reposWithArtifacts} repositories that would be cleaned up`
+          `Preview complete: Found ${totalDeleted} deletable artifacts (${formatBytes(totalSize * 1024 * 1024)}) across ${reposWithArtifacts} repositories (expired artifacts excluded)`
         );
       } else {
         toast.success(
@@ -139,7 +139,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                   placeholder="30"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Delete artifacts older than this many days (expired artifacts are automatically skipped since they cannot be deleted)
+                  Delete non-expired artifacts older than this many days (expired artifacts are automatically excluded from cleanup)
                 </p>
               </div>
             </div>
@@ -152,7 +152,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                 variant="outline"
               >
                 <Eye className="h-4 w-4 mr-2" />
-                Preview Cleanup
+                Preview Deletable Artifacts
               </Button>
               
               <Button
