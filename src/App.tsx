@@ -146,6 +146,7 @@ function App() {
     return (
       <RepositoryDetails 
         repository={selectedRepository} 
+        api={api}
         onBack={handleBackToDashboard}
         onRepositoryUpdate={handleRepositoryUpdate}
       />
