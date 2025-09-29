@@ -64,3 +64,22 @@ export interface Enterprise {
 export interface UserEnterprises {
   enterprises: Enterprise[];
 }
+
+export interface AutoCleanupConfig {
+  enabled: boolean;
+  maxAgeDays: number;
+  includeExpired: boolean;
+  dryRun: boolean;
+}
+
+export interface CleanupResult {
+  deletedCount: number;
+  totalSizeMB: number;
+  errors: string[];
+  artifacts: {
+    name: string;
+    id: number;
+    sizeMB: number;
+    ageDays: number;
+  }[];
+}

@@ -56,6 +56,11 @@
 - **Purpose**: Enable granular management of storage-consuming items
 - **Success Criteria**: Comprehensive artifact listing, metadata display, management actions
 
+### Auto-Cleanup System
+- **Functionality**: Automated cleanup of expired and old artifacts based on configurable rules
+- **Purpose**: Enable proactive storage management without manual intervention
+- **Success Criteria**: Safe preview mode, configurable age thresholds, batch cleanup across repositories, comprehensive reporting
+
 ## Design Direction
 
 ### Visual Tone & Identity

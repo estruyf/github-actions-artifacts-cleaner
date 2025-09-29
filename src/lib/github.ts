@@ -1,4 +1,4 @@
-import { Repository, ActionsStorage, Artifact, RepositoryWithStorage, Enterprise, UserEnterprises } from './types';
+import { Repository, ActionsStorage, Artifact, RepositoryWithStorage, Enterprise, UserEnterprises, AutoCleanupConfig, CleanupResult } from './types';
 
 export class GitHubAPI {
   private token: string | null = null;
@@ -220,6 +220,91 @@ export class GitHubAPI {
       console.error(`Error deleting all artifacts for ${owner}/${repo}:`, error);
       throw new Error('Failed to delete artifacts');
     }
+  }
+
+  async cleanupArtifacts(owner: string, repo: string, config: AutoCleanupConfig): Promise<CleanupResult> {
+    try {
+      const artifacts = await this.getArtifacts(owner, repo);
+      const now = new Date();
+      
+      // Filter artifacts based on cleanup criteria
+      const artifactsToCleanup = artifacts.filter(artifact => {
+        const createdDate = new Date(artifact.created_at);
+        const ageDays = Math.ceil((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Include expired artifacts if configured
+        if (config.includeExpired && artifact.expired) {
+          return true;
+        }
+        
+        // Include artifacts older than max age
+        if (ageDays > config.maxAgeDays) {
+          return true;
+        }
+        
+        return false;
+      });
+
+      const result: CleanupResult = {
+        deletedCount: 0,
+        totalSizeMB: 0,
+        errors: [],
+        artifacts: artifactsToCleanup.map(artifact => {
+          const createdDate = new Date(artifact.created_at);
+          const ageDays = Math.ceil((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            name: artifact.name,
+            id: artifact.id,
+            sizeMB: Math.round(artifact.size_in_bytes / (1024 * 1024) * 100) / 100,
+            ageDays
+          };
+        })
+      };
+
+      result.totalSizeMB = Math.round(result.artifacts.reduce((sum, a) => sum + a.sizeMB, 0) * 100) / 100;
+
+      // If dry run, just return what would be deleted
+      if (config.dryRun) {
+        return result;
+      }
+
+      // Actually delete the artifacts
+      for (const artifact of artifactsToCleanup) {
+        try {
+          await this.deleteArtifact(owner, repo, artifact.id);
+          result.deletedCount++;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          result.errors.push(`Failed to delete ${artifact.name}: ${errorMessage}`);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`Error during cleanup for ${owner}/${repo}:`, error);
+      throw new Error('Failed to perform cleanup');
+    }
+  }
+
+  async bulkCleanupRepositories(repositories: RepositoryWithStorage[], config: AutoCleanupConfig): Promise<Map<string, CleanupResult>> {
+    const results = new Map<string, CleanupResult>();
+    
+    for (const repo of repositories) {
+      try {
+        const result = await this.cleanupArtifacts(repo.owner.login, repo.name, config);
+        results.set(repo.full_name, result);
+      } catch (error) {
+        const errorResult: CleanupResult = {
+          deletedCount: 0,
+          totalSizeMB: 0,
+          errors: [error instanceof Error ? error.message : 'Unknown error'],
+          artifacts: []
+        };
+        results.set(repo.full_name, errorResult);
+      }
+    }
+    
+    return results;
   }
 }
 

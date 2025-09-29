@@ -7,6 +7,7 @@ import { RepositoryTable } from "@/components/RepositoryTable";
 import { RepositoryDetails } from "@/components/RepositoryDetails";
 import { AuthSetup } from "@/components/AuthSetup";
 import { EnterpriseRequest } from "@/components/EnterpriseRequest";
+import { AutoCleanup } from "@/components/AutoCleanup";
 import { Database, ArrowClockwise, SignOut } from "@phosphor-icons/react";
 import { GitHubAPI } from "@/lib/github";
 import { RepositoryWithStorage, StorageStats } from "@/lib/types";
@@ -230,6 +231,13 @@ function App() {
             onEnterpriseRequest={handleEnterpriseRequest}
           />
         )}
+
+        {/* Auto-Cleanup Configuration */}
+        <AutoCleanup 
+          api={api}
+          repositories={repositories}
+          onCleanupComplete={handleRefresh}
+        />
 
         {/* Repository Table */}
         <RepositoryTable
