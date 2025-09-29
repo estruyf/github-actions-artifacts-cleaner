@@ -169,31 +169,9 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
               
               <Alert>
                 <AlertDescription className="text-xs">
-                  <strong>Required permissions:</strong> Actions (read & write), Contents (read), Metadata (read), Pull requests (read)
+                  <strong>Required permissions:</strong> Actions (read & write), Metadata (read)
                 </AlertDescription>
               </Alert>
-            </div>
-
-            <div className="space-y-3 pt-3 border-t border-muted">
-              <h4 className="font-medium text-sm">Alternative: Classic Token</h4>
-              <p className="text-xs text-muted-foreground">
-                Use if fine-grained tokens don't work for your use case.
-              </p>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• <strong>repo</strong> - Access repository information</li>
-                <li>• <strong>actions:read</strong> - View Actions storage and artifacts</li>
-                <li>• <strong>actions:write</strong> - Delete artifacts (required for cleanup)</li>
-              </ul>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => window.open('https://github.com/settings/tokens/new?scopes=repo,actions:read,actions:write&description=GitHub%20Actions%20Storage%20Dashboard', '_blank')}
-              >
-                <ArrowSquareOut className="h-4 w-4 mr-2" />
-                Create Classic Token
-              </Button>
             </div>
           </div>
         </CardContent>
