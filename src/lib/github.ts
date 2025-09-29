@@ -97,6 +97,51 @@ export class GitHubAPI {
       return [];
     }
   }
+
+  async deleteArtifact(owner: string, repo: string, artifactId: number): Promise<void> {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/artifacts/${artifactId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete artifact: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error(`Error deleting artifact ${artifactId}:`, error);
+      throw new Error('Failed to delete artifact');
+    }
+  }
+
+  async deleteAllArtifacts(owner: string, repo: string): Promise<{ deleted: number; failed: number }> {
+    try {
+      const artifacts = await this.getArtifacts(owner, repo);
+      let deleted = 0;
+      let failed = 0;
+
+      // Delete artifacts in parallel but with some rate limiting
+      const deletePromises = artifacts.map(async (artifact) => {
+        try {
+          await this.deleteArtifact(owner, repo, artifact.id);
+          deleted++;
+        } catch (error) {
+          console.error(`Failed to delete artifact ${artifact.id}:`, error);
+          failed++;
+        }
+      });
+
+      await Promise.all(deletePromises);
+      
+      return { deleted, failed };
+    } catch (error) {
+      console.error(`Error deleting all artifacts for ${owner}/${repo}:`, error);
+      throw new Error('Failed to delete artifacts');
+    }
+  }
 }
 
 export const formatBytes = (bytes: number): string => {

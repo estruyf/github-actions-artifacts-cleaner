@@ -1,6 +1,18 @@
+import { useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -15,19 +27,92 @@ import {
   ArrowSquareOut, 
   Download,
   CalendarBlank,
-  ArrowLeft 
+  ArrowLeft,
+  Trash,
+  TrashSimple 
 } from "@phosphor-icons/react";
 import { RepositoryWithStorage } from "@/lib/types";
-import { formatBytes, formatDate, getDaysAgo } from "@/lib/github";
+import { formatBytes, formatDate, getDaysAgo, GitHubAPI } from "@/lib/github";
+import { useKV } from '@github/spark/hooks';
 
 interface RepositoryDetailsProps {
   repository: RepositoryWithStorage;
   onBack: () => void;
+  onRepositoryUpdate?: (updatedRepo: RepositoryWithStorage) => void;
 }
 
-export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps) {
-  const totalArtifactSize = repository.artifacts?.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0) || 0;
-  const expiredArtifacts = repository.artifacts?.filter(artifact => artifact.expired).length || 0;
+export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: RepositoryDetailsProps) {
+  const [currentRepository, setCurrentRepository] = useState(repository);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [artifactToDelete, setArtifactToDelete] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [savedToken] = useKV("github-pat", "");
+
+  const api = new GitHubAPI(savedToken);
+  const totalArtifactSize = currentRepository.artifacts?.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0) || 0;
+  const expiredArtifacts = currentRepository.artifacts?.filter(artifact => artifact.expired).length || 0;
+
+  const refreshArtifacts = async () => {
+    try {
+      const [storage, artifacts] = await Promise.all([
+        api.getActionsStorage(currentRepository.owner.login, currentRepository.name),
+        api.getArtifacts(currentRepository.owner.login, currentRepository.name)
+      ]);
+      
+      const updatedRepo = { 
+        ...currentRepository, 
+        actions_storage: storage, 
+        artifacts 
+      };
+      
+      setCurrentRepository(updatedRepo);
+      onRepositoryUpdate?.(updatedRepo);
+    } catch (error) {
+      console.error('Error refreshing artifacts:', error);
+      toast.error('Failed to refresh artifact data');
+    }
+  };
+
+  const handleDeleteArtifact = async (artifactId: number) => {
+    setIsDeleting(true);
+    try {
+      await api.deleteArtifact(currentRepository.owner.login, currentRepository.name, artifactId);
+      toast.success('Artifact deleted successfully');
+      await refreshArtifacts();
+    } catch (error) {
+      toast.error('Failed to delete artifact');
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setArtifactToDelete(null);
+    }
+  };
+
+  const handleDeleteAllArtifacts = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await api.deleteAllArtifacts(currentRepository.owner.login, currentRepository.name);
+      
+      if (result.failed > 0) {
+        toast.warning(`Deleted ${result.deleted} artifacts, ${result.failed} failed`);
+      } else {
+        toast.success(`Successfully deleted ${result.deleted} artifacts`);
+      }
+      
+      await refreshArtifacts();
+    } catch (error) {
+      toast.error('Failed to delete artifacts');
+    } finally {
+      setIsDeleting(false);
+      setDeleteAllDialogOpen(false);
+    }
+  };
+
+  const openDeleteDialog = (artifactId: number) => {
+    setArtifactToDelete(artifactId);
+    setDeleteDialogOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -41,7 +126,7 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
             </Button>
             <div className="flex items-center gap-2">
               <Archive className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold tracking-tight">{repository.name}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{currentRepository.name}</h1>
             </div>
           </div>
         </div>
@@ -57,10 +142,10 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-primary">
-                  {repository.actions_storage?.total_paid_storage_for_repository_gb.toFixed(2) || '0'} GB
+                  {currentRepository.actions_storage?.total_paid_storage_for_repository_gb.toFixed(2) || '0'} GB
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {formatBytes(repository.actions_storage?.total_paid_storage_for_repository || 0)}
+                  {formatBytes(currentRepository.actions_storage?.total_paid_storage_for_repository || 0)}
                 </p>
               </CardContent>
             </Card>
@@ -72,7 +157,7 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-primary">{repository.artifacts?.length || 0}</div>
+                <div className="text-3xl font-bold text-primary">{currentRepository.artifacts?.length || 0}</div>
                 <p className="text-sm text-muted-foreground mt-1">
                   artifacts stored
                 </p>
@@ -100,20 +185,33 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-primary">{getDaysAgo(repository.updated_at)}</div>
+                <div className="text-3xl font-bold text-primary">{getDaysAgo(currentRepository.updated_at)}</div>
                 <p className="text-sm text-muted-foreground mt-1">days ago</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Artifacts Table */}
-          {repository.artifacts && repository.artifacts.length > 0 ? (
+          {currentRepository.artifacts && currentRepository.artifacts.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Archive className="h-6 w-6" />
-                  Artifacts ({repository.artifacts.length})
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Archive className="h-6 w-6" />
+                    Artifacts ({currentRepository.artifacts.length})
+                  </CardTitle>
+                  {currentRepository.artifacts.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteAllDialogOpen(true)}
+                      disabled={isDeleting}
+                    >
+                      <TrashSimple className="h-4 w-4 mr-2" />
+                      Delete All
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -126,11 +224,11 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
                         <TableHead className="w-[140px]">Created</TableHead>
                         <TableHead className="w-[140px]">Expires</TableHead>
                         <TableHead className="w-[100px]">Status</TableHead>
-                        <TableHead className="w-[120px]">Actions</TableHead>
+                        <TableHead className="w-[180px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {repository.artifacts.map((artifact) => (
+                      {currentRepository.artifacts.map((artifact) => (
                         <TableRow key={artifact.id} className="hover:bg-muted/50">
                           <TableCell>
                             <div className="flex flex-col">
@@ -175,16 +273,25 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => window.open(artifact.archive_download_url, '_blank')}
-                              disabled={artifact.expired}
-                              className="w-full"
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              Download
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(artifact.archive_download_url, '_blank')}
+                                disabled={artifact.expired}
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                Download
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => openDeleteDialog(artifact.id)}
+                                disabled={isDeleting}
+                              >
+                                <Trash className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -214,7 +321,7 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
               <div className="grid gap-3 md:grid-cols-3">
                 <Button
                   variant="outline"
-                  onClick={() => window.open(`${repository.html_url}/actions`, '_blank')}
+                  onClick={() => window.open(`${currentRepository.html_url}/actions`, '_blank')}
                   className="justify-start h-12"
                 >
                   <ArrowSquareOut className="h-4 w-4 mr-3" />
@@ -222,7 +329,7 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => window.open(`${repository.html_url}/settings/actions`, '_blank')}
+                  onClick={() => window.open(`${currentRepository.html_url}/settings/actions`, '_blank')}
                   className="justify-start h-12"
                 >
                   <ArrowSquareOut className="h-4 w-4 mr-3" />
@@ -230,7 +337,7 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => window.open(repository.html_url, '_blank')}
+                  onClick={() => window.open(currentRepository.html_url, '_blank')}
                   className="justify-start h-12"
                 >
                   <ArrowSquareOut className="h-4 w-4 mr-3" />
@@ -241,6 +348,51 @@ export function RepositoryDetails({ repository, onBack }: RepositoryDetailsProps
           </Card>
         </div>
       </div>
+
+      {/* Single Artifact Delete Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Artifact</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this artifact? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => artifactToDelete && handleDeleteArtifact(artifactToDelete)}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Artifacts Dialog */}
+      <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Artifacts</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete all {currentRepository.artifacts?.length || 0} artifacts for this repository? 
+              This action cannot be undone and will free up approximately {formatBytes(totalArtifactSize)} of storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAllArtifacts}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete All'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

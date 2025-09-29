@@ -95,6 +95,14 @@ function App() {
     setLastUpdated(null);
   };
 
+  const handleRepositoryUpdate = (updatedRepo: RepositoryWithStorage) => {
+    setRepositories(current => 
+      current.map(repo => 
+        repo.id === updatedRepo.id ? updatedRepo : repo
+      )
+    );
+  };
+
   const handleRepositorySelect = (repo: RepositoryWithStorage) => {
     setSelectedRepository(repo);
     setCurrentView('repository');
@@ -128,7 +136,13 @@ function App() {
 
   // Show repository details page
   if (currentView === 'repository' && selectedRepository) {
-    return <RepositoryDetails repository={selectedRepository} onBack={handleBackToDashboard} />;
+    return (
+      <RepositoryDetails 
+        repository={selectedRepository} 
+        onBack={handleBackToDashboard}
+        onRepositoryUpdate={handleRepositoryUpdate}
+      />
+    );
   }
 
   // Show main dashboard
