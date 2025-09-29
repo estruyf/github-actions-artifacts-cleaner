@@ -4,18 +4,24 @@ export class GitHubAPI {
   private token: string | null = null;
 
   constructor(token?: string) {
-    if (token) {
-      this.token = token;
+    if (token && token.trim()) {
+      this.token = token.trim();
     }
   }
 
   setToken(token: string) {
-    this.token = token;
+    if (token && token.trim()) {
+      this.token = token.trim();
+    }
+  }
+
+  hasValidToken(): boolean {
+    return !!(this.token && this.token.trim() && this.token !== 'null' && this.token !== 'undefined');
   }
 
   private async makeRequest(url: string): Promise<any> {
-    if (!this.token) {
-      throw new Error('GitHub token not set');
+    if (!this.hasValidToken()) {
+      throw new Error('GitHub token not set or invalid');
     }
 
     const response = await fetch(`https://api.github.com${url}`, {
@@ -99,6 +105,10 @@ export class GitHubAPI {
   }
 
   async deleteArtifact(owner: string, repo: string, artifactId: number): Promise<void> {
+    if (!this.hasValidToken()) {
+      throw new Error('GitHub token not set or invalid');
+    }
+
     try {
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/artifacts/${artifactId}`, {
         method: 'DELETE',

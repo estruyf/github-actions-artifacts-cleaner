@@ -76,16 +76,23 @@ function App() {
       setLastUpdated(new Date().toISOString());
       toast.success("Repository data refreshed successfully");
     } catch (error) {
-      toast.error("Failed to load repositories");
-      console.error("Error loading repositories:", error);
+      if (error instanceof Error && error.message.includes('token')) {
+        toast.error("Authentication failed. Please check your GitHub token.");
+        handleSignOut();
+      } else {
+        toast.error("Failed to load repositories");
+        console.error("Error loading repositories:", error);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleTokenSet = (token: string) => {
-    const newApi = new GitHubAPI(token);
-    setApi(newApi);
+    if (token && token.trim()) {
+      const newApi = new GitHubAPI(token.trim());
+      setApi(newApi);
+    }
   };
 
   const handleSignOut = () => {
@@ -117,8 +124,8 @@ function App() {
 
   // Check if we have a saved token on mount
   useEffect(() => {
-    if (savedToken && !api) {
-      const newApi = new GitHubAPI(savedToken);
+    if (savedToken && savedToken.trim() && !api) {
+      const newApi = new GitHubAPI(savedToken.trim());
       setApi(newApi);
     }
   }, [savedToken, api]);

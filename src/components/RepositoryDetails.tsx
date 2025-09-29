@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,11 +50,23 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
   const [isDeleting, setIsDeleting] = useState(false);
   const [savedToken] = useKV("github-pat", "");
 
-  const api = new GitHubAPI(savedToken);
+  // Create API instance only when token is available and valid
+  const api = useMemo(() => {
+    if (savedToken && savedToken.trim() && savedToken !== 'null' && savedToken !== 'undefined') {
+      return new GitHubAPI(savedToken);
+    }
+    return null;
+  }, [savedToken]);
+
   const totalArtifactSize = currentRepository.artifacts?.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0) || 0;
   const expiredArtifacts = currentRepository.artifacts?.filter(artifact => artifact.expired).length || 0;
 
   const refreshArtifacts = async () => {
+    if (!api) {
+      toast.error('Authentication required. Please check your GitHub token.');
+      return;
+    }
+
     try {
       const [storage, artifacts] = await Promise.all([
         api.getActionsStorage(currentRepository.owner.login, currentRepository.name),
@@ -71,11 +83,20 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
       onRepositoryUpdate?.(updatedRepo);
     } catch (error) {
       console.error('Error refreshing artifacts:', error);
-      toast.error('Failed to refresh artifact data');
+      if (error instanceof Error && error.message.includes('token')) {
+        toast.error('Authentication failed. Please check your GitHub token.');
+      } else {
+        toast.error('Failed to refresh artifact data');
+      }
     }
   };
 
   const handleDeleteArtifact = async (artifactId: number) => {
+    if (!api) {
+      toast.error('Authentication required. Please check your GitHub token.');
+      return;
+    }
+
     setIsDeleting(true);
     try {
       await api.deleteArtifact(currentRepository.owner.login, currentRepository.name, artifactId);
@@ -92,6 +113,11 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
   };
 
   const handleDeleteAllArtifacts = async () => {
+    if (!api) {
+      toast.error('Authentication required. Please check your GitHub token.');
+      return;
+    }
+
     setIsDeleting(true);
     try {
       const result = await api.deleteAllArtifacts(currentRepository.owner.login, currentRepository.name);
@@ -194,22 +220,31 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
             </Card>
           </div>
 
-          {/* Permissions Alert */}
-          <Alert>
-            <AlertDescription>
-              <strong>Permissions Required:</strong> To delete artifacts, your GitHub token must have the <code>actions:write</code> scope. 
-              If you get "401 Unauthorized" errors when deleting, please{' '}
-              <a 
-                href="https://github.com/settings/tokens/new?scopes=repo,actions:read,actions:write&description=GitHub%20Actions%20Storage%20Dashboard" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary underline hover:no-underline"
-              >
-                create a new token
-              </a>{' '}
-              with the required scopes.
-            </AlertDescription>
-          </Alert>
+          {/* Permissions and Token Status Alert */}
+          {!api ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                <strong>Authentication Issue:</strong> Your GitHub token is missing or invalid. 
+                Please refresh the page or re-authenticate to manage artifacts.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <AlertDescription>
+                <strong>Permissions Required:</strong> To delete artifacts, your GitHub token must have the <code>actions:write</code> scope. 
+                If you get "401 Unauthorized" errors when deleting, please{' '}
+                <a 
+                  href="https://github.com/settings/tokens/new?scopes=repo,actions:read,actions:write&description=GitHub%20Actions%20Storage%20Dashboard" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary underline hover:no-underline"
+                >
+                  create a new token
+                </a>{' '}
+                with the required scopes.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Artifacts Table */}
           {currentRepository.artifacts && currentRepository.artifacts.length > 0 ? (
@@ -225,7 +260,7 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
                       variant="destructive"
                       size="sm"
                       onClick={() => setDeleteAllDialogOpen(true)}
-                      disabled={isDeleting}
+                      disabled={isDeleting || !api}
                     >
                       <TrashSimple className="h-4 w-4 mr-2" />
                       Delete All
@@ -307,7 +342,7 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => openDeleteDialog(artifact.id)}
-                                disabled={isDeleting}
+                                disabled={isDeleting || !api}
                               >
                                 <Trash className="h-3 w-3" />
                               </Button>
