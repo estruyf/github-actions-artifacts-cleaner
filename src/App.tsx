@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -151,7 +151,7 @@ function App() {
   }, [savedToken, api]);
 
   useEffect(() => {
-    if (api && (!repositories || repositories.length === 0)) {
+    if (api && repositories.length === 0) {
       loadRepositories();
     }
   }, [api]);
