@@ -97,3 +97,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with [shadcn/ui](https://ui.shadcn.com/) components
 - Icons from [Phosphor Icons](https://phosphoricons.com/)
 - Visitor tracking by [VisitorBadge.io](https://visitorbadge.io/)
+
+[![Visitors](https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fgithub.com%2Festruyf%2Fgithub-actions-artifacts-cleaner&countColor=%23263759)](https://visitorbadge.io/status?path=https%3A%2F%2Fgithub.com%2Festruyf%2Fgithub-actions-artifacts-cleaner)
