@@ -82,7 +82,15 @@ export function RepositoryDetails({ repository, api, onBack, onRepositoryUpdate 
     try {
       await api.deleteArtifact(currentRepository.owner.login, currentRepository.name, artifactId);
       toast.success('Artifact deleted successfully');
-      await refreshArtifacts();
+      
+      // Update local state by removing the deleted artifact
+      const updatedRepo = {
+        ...currentRepository,
+        artifacts: currentRepository.artifacts?.filter(artifact => artifact.id !== artifactId) || []
+      };
+      
+      setCurrentRepository(updatedRepo);
+      onRepositoryUpdate?.(updatedRepo);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete artifact';
       toast.error(errorMessage);
@@ -104,7 +112,14 @@ export function RepositoryDetails({ repository, api, onBack, onRepositoryUpdate 
         toast.success(`Successfully deleted ${result.deleted} artifacts`);
       }
       
-      await refreshArtifacts();
+      // Update local state by clearing all artifacts
+      const updatedRepo = {
+        ...currentRepository,
+        artifacts: []
+      };
+      
+      setCurrentRepository(updatedRepo);
+      onRepositoryUpdate?.(updatedRepo);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete artifacts';
       toast.error(errorMessage);
