@@ -109,10 +109,20 @@ export class GitHubAPI {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Permission denied: Your GitHub token needs "actions:write" scope to delete artifacts. Please create a new token with the required permissions.');
+        } else if (response.status === 403) {
+          throw new Error('Access forbidden: You may not have write access to this repository or the artifact may be protected.');
+        } else if (response.status === 404) {
+          throw new Error('Artifact not found: It may have already been deleted or expired.');
+        }
         throw new Error(`Failed to delete artifact: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       console.error(`Error deleting artifact ${artifactId}:`, error);
+      if (error instanceof Error) {
+        throw error;
+      }
       throw new Error('Failed to delete artifact');
     }
   }

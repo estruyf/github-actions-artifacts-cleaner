@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,7 +82,8 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
       toast.success('Artifact deleted successfully');
       await refreshArtifacts();
     } catch (error) {
-      toast.error('Failed to delete artifact');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete artifact';
+      toast.error(errorMessage);
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
@@ -102,7 +104,8 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
       
       await refreshArtifacts();
     } catch (error) {
-      toast.error('Failed to delete artifacts');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete artifacts';
+      toast.error(errorMessage);
     } finally {
       setIsDeleting(false);
       setDeleteAllDialogOpen(false);
@@ -190,6 +193,23 @@ export function RepositoryDetails({ repository, onBack, onRepositoryUpdate }: Re
               </CardContent>
             </Card>
           </div>
+
+          {/* Permissions Alert */}
+          <Alert>
+            <AlertDescription>
+              <strong>Permissions Required:</strong> To delete artifacts, your GitHub token must have the <code>actions:write</code> scope. 
+              If you get "401 Unauthorized" errors when deleting, please{' '}
+              <a 
+                href="https://github.com/settings/tokens/new?scopes=repo,actions:read,actions:write&description=GitHub%20Actions%20Storage%20Dashboard" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary underline hover:no-underline"
+              >
+                create a new token
+              </a>{' '}
+              with the required scopes.
+            </AlertDescription>
+          </Alert>
 
           {/* Artifacts Table */}
           {currentRepository.artifacts && currentRepository.artifacts.length > 0 ? (

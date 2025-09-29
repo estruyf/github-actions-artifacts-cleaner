@@ -153,19 +153,26 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
           <div className="space-y-3 pt-4 border-t">
             <h4 className="font-medium text-sm">Required Permissions:</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• repo (to access repository information)</li>
-              <li>• actions:read (to read Actions storage data)</li>
-              <li>• actions:write (to delete artifacts)</li>
+              <li>• <strong>repo</strong> - Access repository information</li>
+              <li>• <strong>actions:read</strong> - View Actions storage and artifacts</li>
+              <li>• <strong>actions:write</strong> - Delete artifacts (required for cleanup)</li>
             </ul>
+            
+            <Alert>
+              <AlertDescription className="text-xs">
+                <strong>Important:</strong> The <code>actions:write</code> scope is essential for deleting artifacts. 
+                Without it, you'll get "401 Unauthorized" errors when trying to clean up storage.
+              </AlertDescription>
+            </Alert>
             
             <Button
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => window.open('https://github.com/settings/tokens/new?scopes=repo,actions:read,actions:write', '_blank')}
+              onClick={() => window.open('https://github.com/settings/tokens/new?scopes=repo,actions:read,actions:write&description=GitHub%20Actions%20Storage%20Dashboard', '_blank')}
             >
               <ArrowSquareOut className="h-4 w-4 mr-2" />
-              Create New Token
+              Create New Token with Required Scopes
             </Button>
           </div>
         </CardContent>
