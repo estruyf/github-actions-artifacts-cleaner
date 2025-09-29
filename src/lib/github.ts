@@ -1,4 +1,4 @@
-import { Repository, ActionsStorage, Artifact, RepositoryWithStorage } from './types';
+import { Repository, ActionsStorage, Artifact, RepositoryWithStorage, Enterprise, UserEnterprises } from './types';
 
 export class GitHubAPI {
   private token: string | null = null;
@@ -40,20 +40,10 @@ export class GitHubAPI {
 
   async getRepositories(): Promise<Repository[]> {
     try {
-      // Fetch repositories with different affiliations to include enterprise repos
-      // This includes owned, member, and collaborator repositories
-      const [ownedRepos, memberRepos] = await Promise.all([
-        this.makeRequest('/user/repos?affiliation=owner&sort=updated&per_page=100'),
-        this.makeRequest('/user/repos?affiliation=collaborator,organization_member&sort=updated&per_page=100')
-      ]);
+      // Only fetch user's own repositories by default
+      const repos = await this.makeRequest('/user/repos?affiliation=owner&sort=updated&per_page=100');
       
-      // Combine and deduplicate repositories
-      const allRepos = [...ownedRepos, ...memberRepos];
-      const uniqueRepos = allRepos.filter((repo, index, self) => 
-        index === self.findIndex(r => r.id === repo.id)
-      );
-      
-      return uniqueRepos.map((repo: any) => ({
+      return repos.map((repo: any) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -69,6 +59,64 @@ export class GitHubAPI {
     } catch (error) {
       console.error('Error fetching repositories:', error);
       throw new Error('Failed to fetch repositories');
+    }
+  }
+
+  async getUserEnterprises(): Promise<Enterprise[]> {
+    try {
+      const response = await this.makeRequest('/user/memberships/orgs?state=active&per_page=100');
+      
+      // Filter for enterprise organizations
+      const enterprises: Enterprise[] = [];
+      for (const membership of response) {
+        if (membership.organization && membership.organization.type === 'Organization') {
+          // Check if organization has enterprise features
+          try {
+            const orgDetails = await this.makeRequest(`/orgs/${membership.organization.login}`);
+            if (orgDetails.plan && orgDetails.plan.name === 'enterprise') {
+              enterprises.push({
+                id: orgDetails.id,
+                name: orgDetails.name || orgDetails.login,
+                slug: orgDetails.login,
+                description: orgDetails.description,
+                html_url: orgDetails.html_url
+              });
+            }
+          } catch (error) {
+            // Skip organizations we can't access details for
+            console.warn(`Could not fetch details for organization ${membership.organization.login}`);
+          }
+        }
+      }
+      
+      return enterprises;
+    } catch (error) {
+      console.error('Error fetching user enterprises:', error);
+      return [];
+    }
+  }
+
+  async getEnterpriseRepositories(enterpriseSlug: string): Promise<Repository[]> {
+    try {
+      // Fetch repositories from the enterprise organization
+      const repos = await this.makeRequest(`/orgs/${enterpriseSlug}/repos?sort=updated&per_page=100`);
+      
+      return repos.map((repo: any) => ({
+        id: repo.id,
+        name: repo.name,
+        full_name: repo.full_name,
+        owner: {
+          login: repo.owner.login,
+          avatar_url: repo.owner.avatar_url
+        },
+        html_url: repo.html_url,
+        updated_at: repo.updated_at,
+        size: repo.size,
+        private: repo.private
+      }));
+    } catch (error) {
+      console.error(`Error fetching repositories for enterprise ${enterpriseSlug}:`, error);
+      throw new Error('Failed to fetch enterprise repositories');
     }
   }
 

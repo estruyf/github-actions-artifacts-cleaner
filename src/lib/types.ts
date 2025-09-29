@@ -52,3 +52,15 @@ export interface StorageStats {
   total_artifacts: number;
   oldest_artifact_days: number;
 }
+
+export interface Enterprise {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  html_url: string;
+}
+
+export interface UserEnterprises {
+  enterprises: Enterprise[];
+}

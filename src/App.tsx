@@ -6,6 +6,7 @@ import { StorageOverview } from "@/components/StorageOverview";
 import { RepositoryTable } from "@/components/RepositoryTable";
 import { RepositoryDetails } from "@/components/RepositoryDetails";
 import { AuthSetup } from "@/components/AuthSetup";
+import { EnterpriseRequest } from "@/components/EnterpriseRequest";
 import { Database, ArrowClockwise, SignOut } from "@phosphor-icons/react";
 import { GitHubAPI } from "@/lib/github";
 import { RepositoryWithStorage, StorageStats } from "@/lib/types";
@@ -19,6 +20,7 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [api, setApi] = useState<GitHubAPI | null>(null);
   const [savedToken] = useKV("github-pat", "");
+  const [currentEnterpriseSlug, setCurrentEnterpriseSlug] = useState<string | null>(null);
 
   const calculateStats = (repos: RepositoryWithStorage[]): StorageStats => {
     const reposWithStorage = repos.filter(repo => repo.actions_storage && repo.actions_storage.total_paid_storage_for_repository_gb > 0);
@@ -40,15 +42,19 @@ function App() {
     };
   };
 
-  const loadRepositories = async () => {
+  const loadRepositories = async (enterpriseSlug?: string) => {
     if (!api) return;
     
     setIsLoading(true);
     try {
-      const repos = await api.getRepositories();
+      const repos = enterpriseSlug 
+        ? await api.getEnterpriseRepositories(enterpriseSlug)
+        : await api.getRepositories();
+      
       const reposWithStorage = repos.map(repo => ({ ...repo }));
       
       setRepositories(reposWithStorage);
+      setCurrentEnterpriseSlug(enterpriseSlug || null);
       
       // Load storage data for each repository
       for (const repo of reposWithStorage) {
@@ -74,7 +80,8 @@ function App() {
       }
       
       setLastUpdated(new Date().toISOString());
-      toast.success("Repository data refreshed successfully");
+      const repoType = enterpriseSlug ? "enterprise" : "personal";
+      toast.success(`${repoType} repository data refreshed successfully`);
     } catch (error) {
       if (error instanceof Error && error.message.includes('token')) {
         toast.error("Authentication failed. Please check your GitHub token.");
@@ -100,6 +107,19 @@ function App() {
     setRepositories([]);
     setSelectedRepository(null);
     setLastUpdated(null);
+    setCurrentEnterpriseSlug(null);
+  };
+
+  const handleEnterpriseRequest = async (enterpriseSlug: string) => {
+    await loadRepositories(enterpriseSlug);
+  };
+
+  const handleBackToPersonalRepos = () => {
+    loadRepositories(); // Load without enterprise slug
+  };
+
+  const handleRefresh = () => {
+    loadRepositories(currentEnterpriseSlug || undefined);
   };
 
   const handleRepositoryUpdate = (updatedRepo: RepositoryWithStorage) => {
@@ -162,9 +182,19 @@ function App() {
           <div className="flex items-center gap-3">
             <Database className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">GitHub Actions Storage</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                GitHub Actions Storage
+                {currentEnterpriseSlug && (
+                  <span className="text-xl font-normal text-muted-foreground ml-2">
+                    - {currentEnterpriseSlug}
+                  </span>
+                )}
+              </h1>
               <p className="text-muted-foreground">
-                Monitor storage usage and manage artifacts across your repositories
+                {currentEnterpriseSlug 
+                  ? `Monitor storage usage across ${currentEnterpriseSlug} enterprise repositories`
+                  : "Monitor storage usage and manage artifacts across your repositories"
+                }
               </p>
             </div>
           </div>
@@ -174,7 +204,12 @@ function App() {
                 Last updated: {new Date(lastUpdated).toLocaleString()}
               </p>
             )}
-            <Button onClick={loadRepositories} disabled={isLoading}>
+            {currentEnterpriseSlug && (
+              <Button variant="outline" onClick={handleBackToPersonalRepos}>
+                Back to Personal Repos
+              </Button>
+            )}
+            <Button onClick={handleRefresh} disabled={isLoading}>
               <ArrowClockwise className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
@@ -187,6 +222,14 @@ function App() {
 
         {/* Storage Overview */}
         <StorageOverview stats={stats} isLoading={isLoading} />
+
+        {/* Enterprise Request - Only show for personal repos */}
+        {!currentEnterpriseSlug && (
+          <EnterpriseRequest 
+            api={api} 
+            onEnterpriseRequest={handleEnterpriseRequest}
+          />
+        )}
 
         {/* Repository Table */}
         <RepositoryTable

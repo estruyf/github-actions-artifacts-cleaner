@@ -37,9 +37,14 @@
 - **Success Criteria**: Token validation, secure storage, and seamless re-authentication
 
 ### Repository Overview
-- **Functionality**: Display all user repositories (personal, organization, and enterprise) with storage statistics
-- **Purpose**: Provide comprehensive visibility into storage usage patterns across all accessible repositories
-- **Success Criteria**: Fast loading, accurate data, sortable/filterable interface, includes enterprise repositories
+- **Functionality**: Display all user repositories with storage statistics, plus manual enterprise repository access
+- **Purpose**: Provide comprehensive visibility into storage usage patterns across personal and enterprise repositories
+- **Success Criteria**: Fast loading, accurate data, sortable/filterable interface, manual enterprise repo discovery
+
+### Enterprise Repository Access
+- **Functionality**: Manual request system for viewing enterprise organization repositories
+- **Purpose**: Allow users to analyze storage usage across enterprise repositories they have access to
+- **Success Criteria**: Dropdown selection of available enterprises, successful data loading, clear distinction from personal repos
 
 ### Storage Analytics
 - **Functionality**: Aggregate statistics showing total usage, largest consumers, artifact counts
