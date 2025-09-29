@@ -1,64 +1,54 @@
 import { Repository, ActionsStorage, Artifact, RepositoryWithStorage } from './types';
 
 export class GitHubAPI {
-  private octokit: any;
+  private token: string | null = null;
 
-  constructor() {
-    // Use the spark runtime's user context for authentication
-    this.initializeOctokit();
+  constructor(token?: string) {
+    if (token) {
+      this.token = token;
+    }
   }
 
-  private async initializeOctokit() {
-    // For now, we'll create a mock implementation since we need GitHub token
-    // In a real implementation, this would use proper authentication with spark.user()
+  setToken(token: string) {
+    this.token = token;
+  }
+
+  private async makeRequest(url: string): Promise<any> {
+    if (!this.token) {
+      throw new Error('GitHub token not set');
+    }
+
+    const response = await fetch(`https://api.github.com${url}`, {
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
   async getRepositories(): Promise<Repository[]> {
     try {
-      // Mock data for demonstration - in production this would use real GitHub API
-      const mockRepos: Repository[] = [
-        {
-          id: 1,
-          name: "my-awesome-project",
-          full_name: "user/my-awesome-project",
-          owner: {
-            login: "user",
-            avatar_url: "https://github.com/github.png"
-          },
-          html_url: "https://github.com/user/my-awesome-project",
-          updated_at: "2024-01-15T10:30:00Z",
-          size: 2048,
-          private: false
+      const repos = await this.makeRequest('/user/repos?sort=updated&per_page=100');
+      
+      return repos.map((repo: any) => ({
+        id: repo.id,
+        name: repo.name,
+        full_name: repo.full_name,
+        owner: {
+          login: repo.owner.login,
+          avatar_url: repo.owner.avatar_url
         },
-        {
-          id: 2,
-          name: "data-pipeline",
-          full_name: "user/data-pipeline",
-          owner: {
-            login: "user",
-            avatar_url: "https://github.com/github.png"
-          },
-          html_url: "https://github.com/user/data-pipeline",
-          updated_at: "2024-01-10T14:20:00Z",
-          size: 5120,
-          private: true
-        },
-        {
-          id: 3,
-          name: "web-app",
-          full_name: "user/web-app",
-          owner: {
-            login: "user",
-            avatar_url: "https://github.com/github.png"
-          },
-          html_url: "https://github.com/user/web-app",
-          updated_at: "2024-01-20T09:15:00Z",
-          size: 1024,
-          private: false
-        }
-      ];
-
-      return mockRepos;
+        html_url: repo.html_url,
+        updated_at: repo.updated_at,
+        size: repo.size,
+        private: repo.private
+      }));
     } catch (error) {
       console.error('Error fetching repositories:', error);
       throw new Error('Failed to fetch repositories');
@@ -67,13 +57,14 @@ export class GitHubAPI {
 
   async getActionsStorage(owner: string, repo: string): Promise<ActionsStorage> {
     try {
-      // Mock storage data - in production this would call GitHub API
-      const mockStorage: ActionsStorage = {
-        total_paid_storage_for_repository: Math.floor(Math.random() * 10000000000), // Random bytes
-        total_paid_storage_for_repository_gb: Math.floor(Math.random() * 10) + 0.1
+      // GitHub doesn't have a direct API for Actions storage, so we'll estimate based on artifacts
+      const artifacts = await this.getArtifacts(owner, repo);
+      const totalBytes = artifacts.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0);
+      
+      return {
+        total_paid_storage_for_repository: totalBytes,
+        total_paid_storage_for_repository_gb: totalBytes / (1024 * 1024 * 1024)
       };
-
-      return mockStorage;
     } catch (error) {
       console.error(`Error fetching storage for ${owner}/${repo}:`, error);
       throw new Error('Failed to fetch storage data');
@@ -82,46 +73,28 @@ export class GitHubAPI {
 
   async getArtifacts(owner: string, repo: string): Promise<Artifact[]> {
     try {
-      // Mock artifacts data
-      const mockArtifacts: Artifact[] = [
-        {
-          id: 1,
-          name: "build-artifacts",
-          size_in_bytes: 1024 * 1024 * 50, // 50MB
-          url: "https://api.github.com/repos/user/repo/actions/artifacts/1",
-          archive_download_url: "https://github.com/user/repo/suites/123/artifacts/1",
-          expired: false,
-          created_at: "2024-01-15T10:30:00Z",
-          expires_at: "2024-04-15T10:30:00Z",
-          updated_at: "2024-01-15T10:30:00Z",
-          workflow_run: {
-            id: 123,
-            name: "CI/CD Pipeline",
-            head_branch: "main"
-          }
-        },
-        {
-          id: 2,
-          name: "test-results",
-          size_in_bytes: 1024 * 1024 * 10, // 10MB
-          url: "https://api.github.com/repos/user/repo/actions/artifacts/2",
-          archive_download_url: "https://github.com/user/repo/suites/124/artifacts/2",
-          expired: false,
-          created_at: "2024-01-14T08:20:00Z",
-          expires_at: "2024-04-14T08:20:00Z",
-          updated_at: "2024-01-14T08:20:00Z",
-          workflow_run: {
-            id: 124,
-            name: "Test Suite",
-            head_branch: "develop"
-          }
+      const response = await this.makeRequest(`/repos/${owner}/${repo}/actions/artifacts?per_page=100`);
+      
+      return response.artifacts.map((artifact: any) => ({
+        id: artifact.id,
+        name: artifact.name,
+        size_in_bytes: artifact.size_in_bytes,
+        url: artifact.url,
+        archive_download_url: artifact.archive_download_url,
+        expired: artifact.expired,
+        created_at: artifact.created_at,
+        expires_at: artifact.expires_at,
+        updated_at: artifact.updated_at,
+        workflow_run: {
+          id: artifact.workflow_run?.id || 0,
+          name: artifact.workflow_run?.name || 'Unknown',
+          head_branch: artifact.workflow_run?.head_branch || 'unknown'
         }
-      ];
-
-      return mockArtifacts;
+      }));
     } catch (error) {
       console.error(`Error fetching artifacts for ${owner}/${repo}:`, error);
-      throw new Error('Failed to fetch artifacts');
+      // Return empty array instead of throwing for individual repo failures
+      return [];
     }
   }
 }

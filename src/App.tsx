@@ -5,17 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StorageOverview } from "@/components/StorageOverview";
 import { RepositoryTable } from "@/components/RepositoryTable";
 import { RepositoryDetails } from "@/components/RepositoryDetails";
-import { Database, ArrowClockwise } from "@phosphor-icons/react";
+import { AuthSetup } from "@/components/AuthSetup";
+import { Database, ArrowClockwise, SignOut } from "@phosphor-icons/react";
 import { GitHubAPI } from "@/lib/github";
 import { RepositoryWithStorage, StorageStats } from "@/lib/types";
-
-const api = new GitHubAPI();
+import { useKV } from '@github/spark/hooks';
 
 function App() {
   const [repositories, setRepositories] = useState<RepositoryWithStorage[]>([]);
   const [selectedRepository, setSelectedRepository] = useState<RepositoryWithStorage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [api, setApi] = useState<GitHubAPI | null>(null);
+  const [savedToken] = useKV("github-pat", "");
 
   const calculateStats = (repos: RepositoryWithStorage[]): StorageStats => {
     const reposWithStorage = repos.filter(repo => repo.actions_storage && repo.actions_storage.total_paid_storage_for_repository_gb > 0);
@@ -38,6 +40,8 @@ function App() {
   };
 
   const loadRepositories = async () => {
+    if (!api) return;
+    
     setIsLoading(true);
     try {
       const repos = await api.getRepositories();
@@ -78,17 +82,42 @@ function App() {
     }
   };
 
+  const handleTokenSet = (token: string) => {
+    const newApi = new GitHubAPI(token);
+    setApi(newApi);
+  };
+
+  const handleSignOut = () => {
+    setApi(null);
+    setRepositories([]);
+    setSelectedRepository(null);
+    setLastUpdated(null);
+  };
+
   const handleRepositorySelect = (repo: RepositoryWithStorage) => {
     setSelectedRepository(repo);
   };
 
   const stats = calculateStats(repositories);
 
+  // Check if we have a saved token on mount
   useEffect(() => {
-    if (!repositories || repositories.length === 0) {
+    if (savedToken && !api) {
+      const newApi = new GitHubAPI(savedToken);
+      setApi(newApi);
+    }
+  }, [savedToken, api]);
+
+  useEffect(() => {
+    if (api && (!repositories || repositories.length === 0)) {
       loadRepositories();
     }
-  }, []);
+  }, [api]);
+
+  // Show auth setup if no API is configured
+  if (!api) {
+    return <AuthSetup onTokenSet={handleTokenSet} />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -113,6 +142,10 @@ function App() {
             <Button onClick={loadRepositories} disabled={isLoading}>
               <ArrowClockwise className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
+            </Button>
+            <Button variant="outline" onClick={handleSignOut}>
+              <SignOut className="h-4 w-4 mr-2" />
+              Sign Out
             </Button>
           </div>
         </div>
