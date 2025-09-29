@@ -14,6 +14,7 @@ import { useKV } from '@github/spark/hooks';
 function App() {
   const [repositories, setRepositories] = useState<RepositoryWithStorage[]>([]);
   const [selectedRepository, setSelectedRepository] = useState<RepositoryWithStorage | null>(null);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'repository'>('dashboard');
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [api, setApi] = useState<GitHubAPI | null>(null);
@@ -96,6 +97,12 @@ function App() {
 
   const handleRepositorySelect = (repo: RepositoryWithStorage) => {
     setSelectedRepository(repo);
+    setCurrentView('repository');
+  };
+
+  const handleBackToDashboard = () => {
+    setCurrentView('dashboard');
+    setSelectedRepository(null);
   };
 
   const stats = calculateStats(repositories);
@@ -119,6 +126,12 @@ function App() {
     return <AuthSetup onTokenSet={handleTokenSet} />;
   }
 
+  // Show repository details page
+  if (currentView === 'repository' && selectedRepository) {
+    return <RepositoryDetails repository={selectedRepository} onBack={handleBackToDashboard} />;
+  }
+
+  // Show main dashboard
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4 space-y-8">
@@ -158,13 +171,6 @@ function App() {
           repositories={repositories}
           onRepositorySelect={handleRepositorySelect}
           isLoading={isLoading}
-        />
-
-        {/* Repository Details Modal */}
-        <RepositoryDetails
-          repository={selectedRepository}
-          isOpen={!!selectedRepository}
-          onClose={() => setSelectedRepository(null)}
         />
       </div>
       <Toaster />
