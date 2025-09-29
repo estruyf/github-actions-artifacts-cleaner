@@ -106,16 +106,21 @@ export function RepositoryDetails({ repository, api, onBack, onRepositoryUpdate 
     try {
       const result = await api.deleteAllArtifacts(currentRepository.owner.login, currentRepository.name);
       
+      let message = `Successfully deleted ${result.deleted} artifacts`;
+      if (result.skipped > 0) {
+        message += `, ${result.skipped} expired artifacts skipped`;
+      }
       if (result.failed > 0) {
-        toast.warning(`Deleted ${result.deleted} artifacts, ${result.failed} failed`);
+        message += `, ${result.failed} failed`;
+        toast.warning(message);
       } else {
-        toast.success(`Successfully deleted ${result.deleted} artifacts`);
+        toast.success(message);
       }
       
-      // Update local state by clearing all artifacts
+      // Update local state by keeping only expired artifacts (since we can't delete them)
       const updatedRepo = {
         ...currentRepository,
-        artifacts: []
+        artifacts: currentRepository.artifacts?.filter(artifact => artifact.expired) || []
       };
       
       setCurrentRepository(updatedRepo);

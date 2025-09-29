@@ -122,9 +122,11 @@ export class GitHubAPI {
 
   async getActionsStorage(owner: string, repo: string): Promise<ActionsStorage> {
     try {
-      // GitHub doesn't have a direct API for Actions storage, so we'll estimate based on artifacts
+      // GitHub doesn't have a direct API for Actions storage, so we'll estimate based on non-expired artifacts
       const artifacts = await this.getArtifacts(owner, repo);
-      const totalBytes = artifacts.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0);
+      const totalBytes = artifacts
+        .filter(artifact => !artifact.expired) // Only count non-expired artifacts
+        .reduce((sum, artifact) => sum + artifact.size_in_bytes, 0);
       
       return {
         total_paid_storage_for_repository: totalBytes,
@@ -196,14 +198,19 @@ export class GitHubAPI {
     }
   }
 
-  async deleteAllArtifacts(owner: string, repo: string): Promise<{ deleted: number; failed: number }> {
+  async deleteAllArtifacts(owner: string, repo: string): Promise<{ deleted: number; failed: number; skipped: number }> {
     try {
       const artifacts = await this.getArtifacts(owner, repo);
       let deleted = 0;
       let failed = 0;
+      let skipped = 0;
+
+      // Filter out expired artifacts since they can't be deleted
+      const deletableArtifacts = artifacts.filter(artifact => !artifact.expired);
+      skipped = artifacts.length - deletableArtifacts.length;
 
       // Delete artifacts in parallel but with some rate limiting
-      const deletePromises = artifacts.map(async (artifact) => {
+      const deletePromises = deletableArtifacts.map(async (artifact) => {
         try {
           await this.deleteArtifact(owner, repo, artifact.id);
           deleted++;
@@ -215,7 +222,7 @@ export class GitHubAPI {
 
       await Promise.all(deletePromises);
       
-      return { deleted, failed };
+      return { deleted, failed, skipped };
     } catch (error) {
       console.error(`Error deleting all artifacts for ${owner}/${repo}:`, error);
       throw new Error('Failed to delete artifacts');
@@ -227,22 +234,18 @@ export class GitHubAPI {
       const artifacts = await this.getArtifacts(owner, repo);
       const now = new Date();
       
-      // Filter artifacts based on cleanup criteria
+      // Filter artifacts based on cleanup criteria, but skip expired ones since they can't be deleted
       const artifactsToCleanup = artifacts.filter(artifact => {
+        // Skip expired artifacts - they can't be deleted and don't count toward storage
+        if (artifact.expired) {
+          return false;
+        }
+        
         const createdDate = new Date(artifact.created_at);
         const ageDays = Math.ceil((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
         
-        // Include expired artifacts if configured
-        if (config.includeExpired && artifact.expired) {
-          return true;
-        }
-        
         // Include artifacts older than max age
-        if (ageDays > config.maxAgeDays) {
-          return true;
-        }
-        
-        return false;
+        return ageDays > config.maxAgeDays;
       });
 
       const result: CleanupResult = {
@@ -268,7 +271,7 @@ export class GitHubAPI {
         return result;
       }
 
-      // Actually delete the artifacts
+      // Actually delete the artifacts (skipping expired ones)
       for (const artifact of artifactsToCleanup) {
         try {
           await this.deleteArtifact(owner, repo, artifact.id);

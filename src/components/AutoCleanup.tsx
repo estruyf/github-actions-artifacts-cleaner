@@ -50,7 +50,6 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
       const config: AutoCleanupConfig = {
         enabled: true,
         maxAgeDays: maxAgeDays || 30,
-        includeExpired: false, // Expired artifacts are already deleted and not counted
         dryRun
       };
       const results = await api.bulkCleanupRepositories(repositories, config);
@@ -140,7 +139,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                   placeholder="30"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Delete artifacts older than this many days (expired artifacts are already deleted and not counted in storage)
+                  Delete artifacts older than this many days (expired artifacts are automatically skipped since they cannot be deleted)
                 </p>
               </div>
             </div>

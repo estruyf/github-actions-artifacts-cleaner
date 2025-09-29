@@ -24,8 +24,20 @@ function App() {
   const [currentEnterpriseSlug, setCurrentEnterpriseSlug] = useState<string | null>(null);
 
   const calculateStats = (repos: RepositoryWithStorage[]): StorageStats => {
-    const reposWithStorage = repos.filter(repo => repo.actions_storage && repo.actions_storage.total_paid_storage_for_repository_gb > 0);
-    const totalStorage = reposWithStorage.reduce((sum, repo) => sum + (repo.actions_storage?.total_paid_storage_for_repository_gb || 0), 0);
+    // Calculate storage only from non-expired artifacts since expired artifacts don't contribute to storage
+    const reposWithStorage = repos.filter(repo => {
+      if (!repo.artifacts) return false;
+      const nonExpiredArtifacts = repo.artifacts.filter(artifact => !artifact.expired);
+      return nonExpiredArtifacts.length > 0 && nonExpiredArtifacts.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0) > 0;
+    });
+    
+    const totalStorage = repos.reduce((sum, repo) => {
+      if (!repo.artifacts) return sum;
+      const nonExpiredStorage = repo.artifacts
+        .filter(artifact => !artifact.expired)
+        .reduce((artifactSum, artifact) => artifactSum + artifact.size_in_bytes, 0);
+      return sum + (nonExpiredStorage / (1024 * 1024 * 1024)); // Convert to GB
+    }, 0);
     
     // Count only non-expired artifacts for display purposes (expired artifacts don't contribute to storage)
     const totalArtifacts = repos.reduce((sum, repo) => {
@@ -33,9 +45,12 @@ function App() {
       return sum + repo.artifacts.filter(artifact => !artifact.expired).length;
     }, 0);
     
-    const largestRepo = reposWithStorage.reduce((largest, repo) => {
-      const storage = repo.actions_storage?.total_paid_storage_for_repository_gb || 0;
-      return storage > largest.storage_gb ? { name: repo.name, storage_gb: storage } : largest;
+    const largestRepo = repos.reduce((largest, repo) => {
+      if (!repo.artifacts) return largest;
+      const nonExpiredStorage = repo.artifacts
+        .filter(artifact => !artifact.expired)
+        .reduce((artifactSum, artifact) => artifactSum + artifact.size_in_bytes, 0) / (1024 * 1024 * 1024); // Convert to GB
+      return nonExpiredStorage > largest.storage_gb ? { name: repo.name, storage_gb: nonExpiredStorage } : largest;
     }, { name: 'None', storage_gb: 0 });
 
     return {

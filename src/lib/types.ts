@@ -68,7 +68,6 @@ export interface UserEnterprises {
 export interface AutoCleanupConfig {
   enabled: boolean;
   maxAgeDays: number;
-  includeExpired: boolean;
   dryRun: boolean;
 }
 
