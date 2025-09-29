@@ -26,7 +26,12 @@ function App() {
   const calculateStats = (repos: RepositoryWithStorage[]): StorageStats => {
     const reposWithStorage = repos.filter(repo => repo.actions_storage && repo.actions_storage.total_paid_storage_for_repository_gb > 0);
     const totalStorage = reposWithStorage.reduce((sum, repo) => sum + (repo.actions_storage?.total_paid_storage_for_repository_gb || 0), 0);
-    const totalArtifacts = repos.reduce((sum, repo) => sum + (repo.artifacts?.length || 0), 0);
+    
+    // Count only non-expired artifacts for display purposes (expired artifacts don't contribute to storage)
+    const totalArtifacts = repos.reduce((sum, repo) => {
+      if (!repo.artifacts) return sum;
+      return sum + repo.artifacts.filter(artifact => !artifact.expired).length;
+    }, 0);
     
     const largestRepo = reposWithStorage.reduce((largest, repo) => {
       const storage = repo.actions_storage?.total_paid_storage_for_repository_gb || 0;

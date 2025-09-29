@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
@@ -35,20 +34,8 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
   const [cleanupResults, setCleanupResults] = useState<Map<string, CleanupResult> | null>(null);
   const [showResults, setShowResults] = useState(false);
   
-  // Persistent cleanup configuration
-  const [cleanupConfig, setCleanupConfig] = useKV<AutoCleanupConfig>("auto-cleanup-config", {
-    enabled: true,
-    maxAgeDays: 30,
-    includeExpired: true,
-    dryRun: true
-  });
-
-  const updateConfig = (updates: Partial<AutoCleanupConfig>) => {
-    setCleanupConfig(current => {
-      if (!current) return { enabled: true, maxAgeDays: 30, includeExpired: true, dryRun: true, ...updates };
-      return { ...current, ...updates };
-    });
-  };
+  // Store max age days setting
+  const [maxAgeDays, setMaxAgeDays] = useKV<number>("cleanup-max-age-days", 30);
 
   const runCleanup = async (dryRun: boolean = true) => {
     if (repositories.length === 0) {
@@ -61,9 +48,9 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
     
     try {
       const config: AutoCleanupConfig = {
-        enabled: cleanupConfig?.enabled ?? true,
-        maxAgeDays: cleanupConfig?.maxAgeDays ?? 30,
-        includeExpired: cleanupConfig?.includeExpired ?? true,
+        enabled: true,
+        maxAgeDays: maxAgeDays || 30,
+        includeExpired: false, // Expired artifacts are already deleted and not counted
         dryRun
       };
       const results = await api.bulkCleanupRepositories(repositories, config);
@@ -77,7 +64,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
       
       if (dryRun) {
         toast.success(
-          `Dry run complete: Found ${totalDeleted} artifacts (${formatBytes(totalSize * 1024 * 1024)}) across ${reposWithArtifacts} repositories that would be cleaned up`
+          `Preview complete: Found ${totalDeleted} artifacts (${formatBytes(totalSize * 1024 * 1024)}) across ${reposWithArtifacts} repositories that would be cleaned up`
         );
       } else {
         toast.success(
@@ -121,15 +108,10 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                 <Broom className="h-5 w-5 text-primary" />
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    Auto-Cleanup Configuration
-                    {cleanupConfig?.enabled && (
-                      <Badge variant="secondary" className="text-xs">
-                        Enabled
-                      </Badge>
-                    )}
+                    Artifact Cleanup
                   </CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Automatically clean up expired and old artifacts across repositories
+                    Preview and clean up old artifacts across repositories
                   </p>
                 </div>
               </div>
@@ -145,7 +127,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
         <CollapsibleContent>
           <CardContent className="space-y-6">
             {/* Configuration */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="max-age">Maximum Age (days)</Label>
                 <Input
@@ -153,41 +135,13 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                   type="number"
                   min="1"
                   max="365"
-                  value={cleanupConfig?.maxAgeDays ?? 30}
-                  onChange={(e) => updateConfig({ maxAgeDays: parseInt(e.target.value) || 30 })}
+                  value={maxAgeDays}
+                  onChange={(e) => setMaxAgeDays(parseInt(e.target.value) || 30)}
                   placeholder="30"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Delete artifacts older than this many days
+                  Delete artifacts older than this many days (expired artifacts are already deleted and not counted in storage)
                 </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Include Expired Artifacts</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Also clean up artifacts marked as expired
-                    </p>
-                  </div>
-                  <Switch
-                    checked={cleanupConfig?.includeExpired ?? true}
-                    onCheckedChange={(checked) => updateConfig({ includeExpired: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Enable Auto-Cleanup</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Enable automatic cleanup with these settings
-                    </p>
-                  </div>
-                  <Switch
-                    checked={cleanupConfig?.enabled ?? true}
-                    onCheckedChange={(checked) => updateConfig({ enabled: checked })}
-                  />
-                </div>
               </div>
             </div>
 
@@ -204,7 +158,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
               
               <Button
                 onClick={() => runCleanup(false)}
-                disabled={isRunning || !(cleanupConfig?.enabled ?? true)}
+                disabled={isRunning}
                 variant="default"
               >
                 <Play className="h-4 w-4 mr-2" />

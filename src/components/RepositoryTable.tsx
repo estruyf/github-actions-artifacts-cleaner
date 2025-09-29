@@ -59,8 +59,8 @@ export function RepositoryTable({ repositories, onRepositorySelect, isLoading }:
         valueB = b.actions_storage?.total_paid_storage_for_repository_gb || 0;
         break;
       case 'artifacts':
-        valueA = a.artifacts?.length || 0;
-        valueB = b.artifacts?.length || 0;
+        valueA = a.artifacts?.filter(artifact => !artifact.expired).length || 0;
+        valueB = b.artifacts?.filter(artifact => !artifact.expired).length || 0;
         break;
       default:
         return 0;
@@ -200,10 +200,17 @@ export function RepositoryTable({ repositories, onRepositorySelect, isLoading }:
                 </TableCell>
                 <TableCell>
                   {repo.artifacts ? (
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      <Archive className="h-3 w-3" />
-                      {repo.artifacts.length}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="secondary" className="flex items-center gap-1">
+                        <Archive className="h-3 w-3" />
+                        {repo.artifacts.filter(artifact => !artifact.expired).length}
+                      </Badge>
+                      {repo.artifacts.some(artifact => artifact.expired) && (
+                        <Badge variant="outline" className="text-xs">
+                          {repo.artifacts.filter(artifact => artifact.expired).length} expired
+                        </Badge>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-muted-foreground">-</span>
                   )}
