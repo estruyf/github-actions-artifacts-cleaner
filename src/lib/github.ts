@@ -40,9 +40,20 @@ export class GitHubAPI {
 
   async getRepositories(): Promise<Repository[]> {
     try {
-      const repos = await this.makeRequest('/user/repos?sort=updated&per_page=100');
+      // Fetch repositories with different affiliations to include enterprise repos
+      // This includes owned, member, and collaborator repositories
+      const [ownedRepos, memberRepos] = await Promise.all([
+        this.makeRequest('/user/repos?affiliation=owner&sort=updated&per_page=100'),
+        this.makeRequest('/user/repos?affiliation=collaborator,organization_member&sort=updated&per_page=100')
+      ]);
       
-      return repos.map((repo: any) => ({
+      // Combine and deduplicate repositories
+      const allRepos = [...ownedRepos, ...memberRepos];
+      const uniqueRepos = allRepos.filter((repo, index, self) => 
+        index === self.findIndex(r => r.id === repo.id)
+      );
+      
+      return uniqueRepos.map((repo: any) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
