@@ -155,13 +155,14 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>• repo (to access repository information)</li>
               <li>• actions:read (to read Actions storage data)</li>
+              <li>• actions:write (to delete artifacts)</li>
             </ul>
             
             <Button
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => window.open('https://github.com/settings/tokens/new?scopes=repo,actions:read', '_blank')}
+              onClick={() => window.open('https://github.com/settings/tokens/new?scopes=repo,actions:read,actions:write', '_blank')}
             >
               <ArrowSquareOut className="h-4 w-4 mr-2" />
               Create New Token
