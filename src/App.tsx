@@ -8,10 +8,11 @@ import { RepositoryDetails } from "@/components/RepositoryDetails";
 import { AuthSetup } from "@/components/AuthSetup";
 import { EnterpriseRequest } from "@/components/EnterpriseRequest";
 import { AutoCleanup } from "@/components/AutoCleanup";
+import { VisitorBadge } from "@/components/VisitorBadge";
 import { Database, ArrowClockwise, SignOut } from "@phosphor-icons/react";
 import { GitHubAPI } from "@/lib/github";
 import { RepositoryWithStorage, StorageStats } from "@/lib/types";
-import { useKV } from '@github/spark/hooks';
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 function App() {
   const [repositories, setRepositories] = useState<RepositoryWithStorage[]>([]);
@@ -20,7 +21,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [api, setApi] = useState<GitHubAPI | null>(null);
-  const [savedToken] = useKV("github-pat", "");
+  const [savedToken] = useLocalStorage("github-pat", "");
   const [currentEnterpriseSlug, setCurrentEnterpriseSlug] = useState<string | null>(null);
 
   const calculateStats = (repos: RepositoryWithStorage[]): StorageStats => {
@@ -220,6 +221,7 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <VisitorBadge />
             {lastUpdated && (
               <p className="text-sm text-muted-foreground">
                 Last updated: {new Date(lastUpdated).toLocaleString()}

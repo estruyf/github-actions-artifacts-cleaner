@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Key, ArrowSquareOut, Eye, EyeSlash } from "@phosphor-icons/react";
-import { useKV } from '@github/spark/hooks';
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 interface AuthSetupProps {
   onTokenSet: (token: string) => void;
@@ -16,7 +16,7 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
   const [showToken, setShowToken] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedToken, setSavedToken] = useKV("github-pat", "");
+  const [savedToken, setSavedToken] = useLocalStorage("github-pat", "");
 
   const validateToken = async (tokenToValidate: string) => {
     setIsValidating(true);

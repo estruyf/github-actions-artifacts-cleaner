@@ -20,7 +20,7 @@ import {
 } from "@phosphor-icons/react";
 import { GitHubAPI, formatBytes } from "@/lib/github";
 import { RepositoryWithStorage, AutoCleanupConfig, CleanupResult } from "@/lib/types";
-import { useKV } from '@github/spark/hooks';
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 interface AutoCleanupProps {
   api: GitHubAPI;
@@ -35,7 +35,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
   const [showResults, setShowResults] = useState(false);
   
   // Store max age days setting
-  const [maxAgeDays, setMaxAgeDays] = useKV<number>("cleanup-max-age-days", 30);
+  const [maxAgeDays, setMaxAgeDays] = useLocalStorage<number>("cleanup-max-age-days", 30);
 
   const runCleanup = async (dryRun: boolean = true) => {
     if (repositories.length === 0) {

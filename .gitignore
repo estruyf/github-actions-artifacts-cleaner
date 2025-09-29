@@ -7,10 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Runtime and build outputs
 node_modules
 dist
 dist-ssr
-*-dist
 *.local
 
 # Editor directories and files
@@ -24,11 +24,20 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables
 .env
-**/agent-eval-report*
-packages
-pids
-.file-manifest
-.devcontainer/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-.spark-workbench-id
+# Dependencies
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build info
+.tsbuildinfo
+
+# OS generated files
+Thumbs.db
