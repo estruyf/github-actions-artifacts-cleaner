@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StorageOverview } from "@/components/StorageOverview";
 import { RepositoryTable } from "@/components/RepositoryTable";
 import { RepositoryDetails } from "@/components/RepositoryDetails";
 import { AuthSetup } from "@/components/AuthSetup";
 import { EnterpriseRequest } from "@/components/EnterpriseRequest";
 import { AutoCleanup } from "@/components/AutoCleanup";
-import { VisitorBadge } from "@/components/VisitorBadge";
+import { Footer } from "@/components/Footer";
 import { Database, ArrowClockwise, SignOut } from "@phosphor-icons/react";
 import { GitHubAPI } from "@/lib/github";
 import { RepositoryWithStorage, StorageStats } from "@/lib/types";
@@ -21,7 +20,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [api, setApi] = useState<GitHubAPI | null>(null);
-  const [savedToken] = useLocalStorage("github-pat", "");
+  const [savedToken, _, deleteValue] = useLocalStorage("github-pat", "");
   const [currentEnterpriseSlug, setCurrentEnterpriseSlug] = useState<string | null>(null);
 
   const calculateStats = (repos: RepositoryWithStorage[]): StorageStats => {
@@ -31,7 +30,7 @@ function App() {
       const nonExpiredArtifacts = repo.artifacts.filter(artifact => !artifact.expired);
       return nonExpiredArtifacts.length > 0 && nonExpiredArtifacts.reduce((sum, artifact) => sum + artifact.size_in_bytes, 0) > 0;
     });
-    
+
     const totalStorage = repos.reduce((sum, repo) => {
       if (!repo.artifacts) return sum;
       const nonExpiredStorage = repo.artifacts
@@ -39,13 +38,13 @@ function App() {
         .reduce((artifactSum, artifact) => artifactSum + artifact.size_in_bytes, 0);
       return sum + (nonExpiredStorage / (1024 * 1024 * 1024)); // Convert to GB
     }, 0);
-    
+
     // Count only non-expired artifacts for display purposes (expired artifacts don't contribute to storage)
     const totalArtifacts = repos.reduce((sum, repo) => {
       if (!repo.artifacts) return sum;
       return sum + repo.artifacts.filter(artifact => !artifact.expired).length;
     }, 0);
-    
+
     const largestRepo = repos.reduce((largest, repo) => {
       if (!repo.artifacts) return largest;
       const nonExpiredStorage = repo.artifacts
@@ -66,18 +65,18 @@ function App() {
 
   const loadRepositories = async (enterpriseSlug?: string) => {
     if (!api) return;
-    
+
     setIsLoading(true);
     try {
-      const repos = enterpriseSlug 
+      const repos = enterpriseSlug
         ? await api.getEnterpriseRepositories(enterpriseSlug)
         : await api.getRepositories();
-      
+
       const reposWithStorage = repos.map(repo => ({ ...repo }));
-      
+
       setRepositories(reposWithStorage);
       setCurrentEnterpriseSlug(enterpriseSlug || null);
-      
+
       // Load storage data for each repository
       for (const repo of reposWithStorage) {
         try {
@@ -85,22 +84,22 @@ function App() {
             api.getActionsStorage(repo.owner.login, repo.name),
             api.getArtifacts(repo.owner.login, repo.name)
           ]);
-          
-          setRepositories((current) => current.map(r => 
-            r.id === repo.id 
+
+          setRepositories((current) => current.map(r =>
+            r.id === repo.id
               ? { ...r, actions_storage: storage, artifacts }
               : r
           ));
         } catch (error) {
           console.error(`Error loading data for ${repo.name}:`, error);
-          setRepositories((current) => current.map(r => 
-            r.id === repo.id 
+          setRepositories((current) => current.map(r =>
+            r.id === repo.id
               ? { ...r, storage_error: 'Failed to load' }
               : r
           ));
         }
       }
-      
+
       setLastUpdated(new Date().toISOString());
       const repoType = enterpriseSlug ? "enterprise" : "personal";
       toast.success(`${repoType} repository data refreshed successfully`);
@@ -130,6 +129,8 @@ function App() {
     setSelectedRepository(null);
     setLastUpdated(null);
     setCurrentEnterpriseSlug(null);
+    deleteValue();
+    window.location.reload();
   };
 
   const handleEnterpriseRequest = async (enterpriseSlug: string) => {
@@ -145,8 +146,8 @@ function App() {
   };
 
   const handleRepositoryUpdate = (updatedRepo: RepositoryWithStorage) => {
-    setRepositories(current => 
-      current.map(repo => 
+    setRepositories(current =>
+      current.map(repo =>
         repo.id === updatedRepo.id ? updatedRepo : repo
       )
     );
@@ -186,8 +187,8 @@ function App() {
   // Show repository details page
   if (currentView === 'repository' && selectedRepository) {
     return (
-      <RepositoryDetails 
-        repository={selectedRepository} 
+      <RepositoryDetails
+        repository={selectedRepository}
         api={api}
         onBack={handleBackToDashboard}
         onRepositoryUpdate={handleRepositoryUpdate}
@@ -213,7 +214,7 @@ function App() {
                 )}
               </h1>
               <p className="text-muted-foreground">
-                {currentEnterpriseSlug 
+                {currentEnterpriseSlug
                   ? `Monitor storage usage across ${currentEnterpriseSlug} enterprise repositories`
                   : "Monitor storage usage and manage artifacts across your repositories"
                 }
@@ -221,7 +222,6 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <VisitorBadge />
             {lastUpdated && (
               <p className="text-sm text-muted-foreground">
                 Last updated: {new Date(lastUpdated).toLocaleString()}
@@ -248,14 +248,14 @@ function App() {
 
         {/* Enterprise Request - Only show for personal repos */}
         {!currentEnterpriseSlug && (
-          <EnterpriseRequest 
-            api={api} 
+          <EnterpriseRequest
+            api={api}
             onEnterpriseRequest={handleEnterpriseRequest}
           />
         )}
 
         {/* Auto-Cleanup Configuration */}
-        <AutoCleanup 
+        <AutoCleanup
           api={api}
           repositories={repositories}
           onCleanupComplete={handleRefresh}
@@ -267,6 +267,8 @@ function App() {
           onRepositorySelect={handleRepositorySelect}
           isLoading={isLoading}
         />
+
+        <Footer />
       </div>
       <Toaster />
     </div>

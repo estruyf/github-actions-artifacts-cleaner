@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Key, ArrowSquareOut, Eye, EyeSlash } from "@phosphor-icons/react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { VisitorBadge } from "./VisitorBadge";
+import { Footer } from "./Footer";
 
 interface AuthSetupProps {
   onTokenSet: (token: string) => void;
@@ -21,7 +23,7 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
   const validateToken = async (tokenToValidate: string) => {
     setIsValidating(true);
     setError(null);
-    
+
     try {
       const response = await fetch('https://api.github.com/user', {
         headers: {
@@ -53,7 +55,7 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token.trim()) return;
-    
+
     await validateToken(token.trim());
   };
 
@@ -70,7 +72,7 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -142,9 +144,9 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
               </Alert>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={!token.trim() || isValidating}
             >
               {isValidating ? "Validating..." : "Connect to GitHub"}
@@ -166,16 +168,22 @@ export function AuthSetup({ onTokenSet }: AuthSetupProps) {
                 <ArrowSquareOut className="h-4 w-4 mr-2" />
                 Create Fine-grained Token (Recommended)
               </Button>
-              
+
               <Alert>
-                <AlertDescription className="text-xs">
-                  <strong>Required permissions:</strong> Actions (read & write), Metadata (read)
+                <AlertDescription className="text-xs space-y-2">
+                  <div>
+                    <strong>Personal repositories:</strong> Actions (read & write), Metadata (read)
+                  </div>
+                  <div>
+                    <strong>Enterprise repositories (optional):</strong> Members (read)
+                  </div>
                 </AlertDescription>
               </Alert>
             </div>
           </div>
         </CardContent>
       </Card>
+      <Footer />
     </div>
   );
 }

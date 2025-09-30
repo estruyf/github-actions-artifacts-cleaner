@@ -42,7 +42,7 @@ export function EnterpriseRequest({ api, onEnterpriseRequest }: EnterpriseReques
 
   const handleRequest = async () => {
     const enterpriseSlug = activeTab === "select" ? selectedEnterprise : manualEnterprise.trim();
-    
+
     if (!enterpriseSlug) {
       toast.error("Please provide an enterprise name");
       return;
@@ -72,7 +72,7 @@ export function EnterpriseRequest({ api, onEnterpriseRequest }: EnterpriseReques
         <p className="text-sm text-muted-foreground">
           Access repositories from enterprise organizations by selecting from your available enterprises or entering the organization name directly.
         </p>
-        
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="select" disabled={enterprises.length === 0 && !isLoading}>
@@ -83,7 +83,7 @@ export function EnterpriseRequest({ api, onEnterpriseRequest }: EnterpriseReques
               Enter Manually
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="select" className="space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -97,30 +97,34 @@ export function EnterpriseRequest({ api, onEnterpriseRequest }: EnterpriseReques
               </div>
             ) : (
               <div className="space-y-3">
-                <Label htmlFor="enterprise-select">Select from your enterprises:</Label>
-                <Select value={selectedEnterprise} onValueChange={setSelectedEnterprise}>
-                  <SelectTrigger id="enterprise-select">
-                    <SelectValue placeholder="Select an enterprise" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {enterprises.map((enterprise) => (
-                      <SelectItem key={enterprise.id} value={enterprise.slug}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{enterprise.name}</span>
-                          {enterprise.description && (
-                            <span className="text-xs text-muted-foreground">
-                              {enterprise.description}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Your enterprises:</Label>
+                <div className="space-y-2">
+                  {enterprises.map((enterprise) => (
+                    <div key={enterprise.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{enterprise.name}</span>
+                        <span className="text-sm text-muted-foreground">{enterprise.slug}</span>
+                        {enterprise.description && (
+                          <span className="text-xs text-muted-foreground mt-1">
+                            {enterprise.description}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => onEnterpriseRequest(enterprise.slug)}
+                        disabled={isRequesting}
+                        size="sm"
+                      >
+                        <Download className={`h-4 w-4 mr-2 ${isRequesting ? 'animate-spin' : ''}`} />
+                        Apply
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </TabsContent>
-          
+
           <TabsContent value="manual" className="space-y-4">
             <div className="space-y-3">
               <Label htmlFor="enterprise-input">Enterprise name:</Label>
@@ -141,20 +145,18 @@ export function EnterpriseRequest({ api, onEnterpriseRequest }: EnterpriseReques
             </div>
           </TabsContent>
         </Tabs>
-        
-        <div className="flex justify-end">
-          <Button 
-            onClick={handleRequest} 
-            disabled={
-              isRequesting || 
-              (activeTab === "select" && !selectedEnterprise) ||
-              (activeTab === "manual" && !manualEnterprise.trim())
-            }
-          >
-            <Download className={`h-4 w-4 mr-2 ${isRequesting ? 'animate-spin' : ''}`} />
-            {isRequesting ? 'Loading...' : 'Apply'}
-          </Button>
-        </div>
+
+        {activeTab === "manual" && (
+          <div className="flex justify-end">
+            <Button
+              onClick={handleRequest}
+              disabled={isRequesting || !manualEnterprise.trim()}
+            >
+              <Download className={`h-4 w-4 mr-2 ${isRequesting ? 'animate-spin' : ''}`} />
+              {isRequesting ? 'Loading...' : 'Apply'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

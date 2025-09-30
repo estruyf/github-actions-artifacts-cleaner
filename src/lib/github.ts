@@ -1,4 +1,13 @@
-import { Repository, ActionsStorage, Artifact, RepositoryWithStorage, Enterprise, UserEnterprises, AutoCleanupConfig, CleanupResult } from './types';
+import {
+  Repository,
+  ActionsStorage,
+  Artifact,
+  RepositoryWithStorage,
+  Enterprise,
+  UserEnterprises,
+  AutoCleanupConfig,
+  CleanupResult,
+} from "./types";
 
 export class GitHubAPI {
   private token: string | null = null;
@@ -16,23 +25,30 @@ export class GitHubAPI {
   }
 
   hasValidToken(): boolean {
-    return !!(this.token && this.token.trim() && this.token !== 'null' && this.token !== 'undefined');
+    return !!(
+      this.token &&
+      this.token.trim() &&
+      this.token !== "null" &&
+      this.token !== "undefined"
+    );
   }
 
   private async makeRequest(url: string): Promise<any> {
     if (!this.hasValidToken()) {
-      throw new Error('GitHub token not set or invalid');
+      throw new Error("GitHub token not set or invalid");
     }
 
     const response = await fetch(`https://api.github.com${url}`, {
       headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Accept': 'application/vnd.github.v3+json',
+        Authorization: `Bearer ${this.token}`,
+        Accept: "application/vnd.github.v3+json",
       },
     });
 
     if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `GitHub API error: ${response.status} ${response.statusText}`
+      );
     }
 
     return response.json();
@@ -41,107 +57,119 @@ export class GitHubAPI {
   async getRepositories(): Promise<Repository[]> {
     try {
       // Only fetch user's own repositories by default
-      const repos = await this.makeRequest('/user/repos?affiliation=owner&sort=updated&per_page=100');
-      
+      const repos = await this.makeRequest(
+        "/user/repos?affiliation=owner&sort=updated&per_page=100"
+      );
+
       return repos.map((repo: any) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
         owner: {
           login: repo.owner.login,
-          avatar_url: repo.owner.avatar_url
+          avatar_url: repo.owner.avatar_url,
         },
         html_url: repo.html_url,
         updated_at: repo.updated_at,
         size: repo.size,
-        private: repo.private
+        private: repo.private,
       }));
     } catch (error) {
-      console.error('Error fetching repositories:', error);
-      throw new Error('Failed to fetch repositories');
+      console.error("Error fetching repositories:", error);
+      throw new Error("Failed to fetch repositories");
     }
   }
 
   async getUserEnterprises(): Promise<Enterprise[]> {
     try {
-      const response = await this.makeRequest('/user/memberships/orgs?state=active&per_page=100');
-      
+      const response = await this.makeRequest("/user/orgs");
+
       // Filter for enterprise organizations
       const enterprises: Enterprise[] = [];
-      for (const membership of response) {
-        if (membership.organization && membership.organization.type === 'Organization') {
-          // Check if organization has enterprise features
-          try {
-            const orgDetails = await this.makeRequest(`/orgs/${membership.organization.login}`);
-            if (orgDetails.plan && orgDetails.plan.name === 'enterprise') {
-              enterprises.push({
-                id: orgDetails.id,
-                name: orgDetails.name || orgDetails.login,
-                slug: orgDetails.login,
-                description: orgDetails.description,
-                html_url: orgDetails.html_url
-              });
-            }
-          } catch (error) {
-            // Skip organizations we can't access details for
-            console.warn(`Could not fetch details for organization ${membership.organization.login}`);
+      for (const org of response) {
+        // org is already the organization object from /user/orgs
+        try {
+          const orgDetails = await this.makeRequest(`/orgs/${org.login}`);
+          if (orgDetails.plan && orgDetails.plan.name === "enterprise") {
+            enterprises.push({
+              id: orgDetails.id,
+              name: orgDetails.name || orgDetails.login,
+              slug: orgDetails.login,
+              description: orgDetails.description,
+              html_url: orgDetails.html_url,
+            });
           }
+        } catch (error) {
+          // Skip organizations we can't access details for
+          console.warn(`Could not fetch details for organization ${org.login}`);
         }
       }
-      
+
       return enterprises;
     } catch (error) {
-      console.error('Error fetching user enterprises:', error);
+      console.error("Error fetching user enterprises:", error);
       return [];
     }
   }
 
-  async getEnterpriseRepositories(enterpriseSlug: string): Promise<Repository[]> {
+  async getEnterpriseRepositories(
+    enterpriseSlug: string
+  ): Promise<Repository[]> {
     try {
       // Fetch repositories from the enterprise organization
-      const repos = await this.makeRequest(`/orgs/${enterpriseSlug}/repos?sort=updated&per_page=100`);
-      
+      const repos = await this.makeRequest(
+        `/orgs/${enterpriseSlug}/repos?sort=updated&per_page=100`
+      );
+
       return repos.map((repo: any) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
         owner: {
           login: repo.owner.login,
-          avatar_url: repo.owner.avatar_url
+          avatar_url: repo.owner.avatar_url,
         },
         html_url: repo.html_url,
         updated_at: repo.updated_at,
         size: repo.size,
-        private: repo.private
+        private: repo.private,
       }));
     } catch (error) {
-      console.error(`Error fetching repositories for enterprise ${enterpriseSlug}:`, error);
-      throw new Error('Failed to fetch enterprise repositories');
+      console.error(
+        `Error fetching repositories for enterprise ${enterpriseSlug}:`,
+        error
+      );
+      throw new Error("Failed to fetch enterprise repositories");
     }
   }
 
-  async getActionsStorage(owner: string, repo: string): Promise<ActionsStorage> {
+  async getActionsStorage(
+    owner: string,
+    repo: string
+  ): Promise<ActionsStorage> {
     try {
       // GitHub doesn't have a direct API for Actions storage, so we'll estimate based on non-expired artifacts
       const artifacts = await this.getArtifacts(owner, repo);
       const totalBytes = artifacts
-        .filter(artifact => !artifact.expired) // Only count non-expired artifacts
+        .filter((artifact) => !artifact.expired) // Only count non-expired artifacts
         .reduce((sum, artifact) => sum + artifact.size_in_bytes, 0);
-      
+
       return {
         total_paid_storage_for_repository: totalBytes,
-        total_paid_storage_for_repository_gb: totalBytes / (1024 * 1024 * 1024)
+        total_paid_storage_for_repository_gb: totalBytes / (1024 * 1024 * 1024),
       };
     } catch (error) {
       console.error(`Error fetching storage for ${owner}/${repo}:`, error);
-      throw new Error('Failed to fetch storage data');
+      throw new Error("Failed to fetch storage data");
     }
   }
 
   async getArtifacts(owner: string, repo: string): Promise<Artifact[]> {
     try {
-      const response = await this.makeRequest(`/repos/${owner}/${repo}/actions/artifacts?per_page=100`);
-      
+      const response = await this.makeRequest(
+        `/repos/${owner}/${repo}/actions/artifacts?per_page=100`
+      );
+
       return response.artifacts.map((artifact: any) => ({
         id: artifact.id,
         name: artifact.name,
@@ -154,9 +182,9 @@ export class GitHubAPI {
         updated_at: artifact.updated_at,
         workflow_run: {
           id: artifact.workflow_run?.id || 0,
-          name: artifact.workflow_run?.name || 'Unknown',
-          head_branch: artifact.workflow_run?.head_branch || 'unknown'
-        }
+          name: artifact.workflow_run?.name || "Unknown",
+          head_branch: artifact.workflow_run?.head_branch || "unknown",
+        },
       }));
     } catch (error) {
       console.error(`Error fetching artifacts for ${owner}/${repo}:`, error);
@@ -165,40 +193,58 @@ export class GitHubAPI {
     }
   }
 
-  async deleteArtifact(owner: string, repo: string, artifactId: number): Promise<void> {
+  async deleteArtifact(
+    owner: string,
+    repo: string,
+    artifactId: number
+  ): Promise<void> {
     if (!this.hasValidToken()) {
-      throw new Error('GitHub token not set or invalid');
+      throw new Error("GitHub token not set or invalid");
     }
 
     try {
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/artifacts/${artifactId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      });
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/actions/artifacts/${artifactId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            Accept: "application/vnd.github.v3+json",
+          },
+        }
+      );
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('Permission denied: Your GitHub token needs "actions:write" scope to delete artifacts. Please create a new token with the required permissions.');
+          throw new Error(
+            'Permission denied: Your GitHub token needs "actions:write" scope to delete artifacts. Please create a new token with the required permissions.'
+          );
         } else if (response.status === 403) {
-          throw new Error('Access forbidden: You may not have write access to this repository or the artifact may be protected.');
+          throw new Error(
+            "Access forbidden: You may not have write access to this repository or the artifact may be protected."
+          );
         } else if (response.status === 404) {
-          throw new Error('Artifact not found: It may have already been deleted or expired.');
+          throw new Error(
+            "Artifact not found: It may have already been deleted or expired."
+          );
         }
-        throw new Error(`Failed to delete artifact: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to delete artifact: ${response.status} ${response.statusText}`
+        );
       }
     } catch (error) {
       console.error(`Error deleting artifact ${artifactId}:`, error);
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error('Failed to delete artifact');
+      throw new Error("Failed to delete artifact");
     }
   }
 
-  async deleteAllArtifacts(owner: string, repo: string): Promise<{ deleted: number; failed: number; skipped: number }> {
+  async deleteAllArtifacts(
+    owner: string,
+    repo: string
+  ): Promise<{ deleted: number; failed: number; skipped: number }> {
     try {
       const artifacts = await this.getArtifacts(owner, repo);
       let deleted = 0;
@@ -206,7 +252,9 @@ export class GitHubAPI {
       let skipped = 0;
 
       // Filter out expired artifacts since they can't be deleted
-      const deletableArtifacts = artifacts.filter(artifact => !artifact.expired);
+      const deletableArtifacts = artifacts.filter(
+        (artifact) => !artifact.expired
+      );
       skipped = artifacts.length - deletableArtifacts.length;
 
       // Delete artifacts in parallel but with some rate limiting
@@ -221,29 +269,38 @@ export class GitHubAPI {
       });
 
       await Promise.all(deletePromises);
-      
+
       return { deleted, failed, skipped };
     } catch (error) {
-      console.error(`Error deleting all artifacts for ${owner}/${repo}:`, error);
-      throw new Error('Failed to delete artifacts');
+      console.error(
+        `Error deleting all artifacts for ${owner}/${repo}:`,
+        error
+      );
+      throw new Error("Failed to delete artifacts");
     }
   }
 
-  async cleanupArtifacts(owner: string, repo: string, config: AutoCleanupConfig): Promise<CleanupResult> {
+  async cleanupArtifacts(
+    owner: string,
+    repo: string,
+    config: AutoCleanupConfig
+  ): Promise<CleanupResult> {
     try {
       const artifacts = await this.getArtifacts(owner, repo);
       const now = new Date();
-      
+
       // Filter artifacts based on cleanup criteria, but skip expired ones since they can't be deleted
-      const artifactsToCleanup = artifacts.filter(artifact => {
+      const artifactsToCleanup = artifacts.filter((artifact) => {
         // Skip expired artifacts - they can't be deleted and don't count toward storage
         if (artifact.expired) {
           return false;
         }
-        
+
         const createdDate = new Date(artifact.created_at);
-        const ageDays = Math.ceil((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-        
+        const ageDays = Math.ceil(
+          (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
         // Include artifacts older than max age
         return ageDays > config.maxAgeDays;
       });
@@ -252,19 +309,25 @@ export class GitHubAPI {
         deletedCount: 0,
         totalSizeMB: 0,
         errors: [],
-        artifacts: artifactsToCleanup.map(artifact => {
+        artifacts: artifactsToCleanup.map((artifact) => {
           const createdDate = new Date(artifact.created_at);
-          const ageDays = Math.ceil((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+          const ageDays = Math.ceil(
+            (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
           return {
             name: artifact.name,
             id: artifact.id,
-            sizeMB: Math.round(artifact.size_in_bytes / (1024 * 1024) * 100) / 100,
-            ageDays
+            sizeMB:
+              Math.round((artifact.size_in_bytes / (1024 * 1024)) * 100) / 100,
+            ageDays,
           };
-        })
+        }),
       };
 
-      result.totalSizeMB = Math.round(result.artifacts.reduce((sum, a) => sum + a.sizeMB, 0) * 100) / 100;
+      result.totalSizeMB =
+        Math.round(
+          result.artifacts.reduce((sum, a) => sum + a.sizeMB, 0) * 100
+        ) / 100;
 
       // If dry run, just return what would be deleted
       if (config.dryRun) {
@@ -277,55 +340,65 @@ export class GitHubAPI {
           await this.deleteArtifact(owner, repo, artifact.id);
           result.deletedCount++;
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          result.errors.push(`Failed to delete ${artifact.name}: ${errorMessage}`);
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
+          result.errors.push(
+            `Failed to delete ${artifact.name}: ${errorMessage}`
+          );
         }
       }
 
       return result;
     } catch (error) {
       console.error(`Error during cleanup for ${owner}/${repo}:`, error);
-      throw new Error('Failed to perform cleanup');
+      throw new Error("Failed to perform cleanup");
     }
   }
 
-  async bulkCleanupRepositories(repositories: RepositoryWithStorage[], config: AutoCleanupConfig): Promise<Map<string, CleanupResult>> {
+  async bulkCleanupRepositories(
+    repositories: RepositoryWithStorage[],
+    config: AutoCleanupConfig
+  ): Promise<Map<string, CleanupResult>> {
     const results = new Map<string, CleanupResult>();
-    
+
     for (const repo of repositories) {
       try {
-        const result = await this.cleanupArtifacts(repo.owner.login, repo.name, config);
+        const result = await this.cleanupArtifacts(
+          repo.owner.login,
+          repo.name,
+          config
+        );
         results.set(repo.full_name, result);
       } catch (error) {
         const errorResult: CleanupResult = {
           deletedCount: 0,
           totalSizeMB: 0,
-          errors: [error instanceof Error ? error.message : 'Unknown error'],
-          artifacts: []
+          errors: [error instanceof Error ? error.message : "Unknown error"],
+          artifacts: [],
         };
         results.set(repo.full_name, errorResult);
       }
     }
-    
+
     return results;
   }
 }
 
 export const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  
+  if (bytes === 0) return "0 B";
+
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
 
 export const formatDate = (date: string): string => {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
+  return new Date(date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   });
 };
 
