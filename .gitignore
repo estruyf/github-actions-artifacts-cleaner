@@ -41,3 +41,5 @@ pnpm-lock.yaml
 
 # OS generated files
 Thumbs.db
+
+dist
