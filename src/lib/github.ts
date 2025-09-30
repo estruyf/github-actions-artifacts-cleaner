@@ -56,12 +56,29 @@ export class GitHubAPI {
 
   async getRepositories(): Promise<Repository[]> {
     try {
-      // Only fetch user's own repositories by default
-      const repos = await this.makeRequest(
-        "/user/repos?affiliation=owner&sort=updated&per_page=100"
-      );
+      let allRepos: any[] = [];
+      let page = 1;
+      let hasMorePages = true;
 
-      return repos.map((repo: any) => ({
+      // Fetch all repositories using pagination
+      while (hasMorePages) {
+        const repos = await this.makeRequest(
+          `/user/repos?affiliation=owner&sort=updated&per_page=100&page=${page}`
+        );
+
+        if (repos.length === 0) {
+          hasMorePages = false;
+        } else {
+          allRepos = allRepos.concat(repos);
+          page++;
+          // If we got less than 100 repos, we're on the last page
+          if (repos.length < 100) {
+            hasMorePages = false;
+          }
+        }
+      }
+
+      return allRepos.map((repo: any) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -166,11 +183,29 @@ export class GitHubAPI {
 
   async getArtifacts(owner: string, repo: string): Promise<Artifact[]> {
     try {
-      const response = await this.makeRequest(
-        `/repos/${owner}/${repo}/actions/artifacts?per_page=100`
-      );
+      let allArtifacts: any[] = [];
+      let page = 1;
+      let hasMorePages = true;
 
-      return response.artifacts.map((artifact: any) => ({
+      // Fetch all artifacts using pagination
+      while (hasMorePages) {
+        const response = await this.makeRequest(
+          `/repos/${owner}/${repo}/actions/artifacts?per_page=100&page=${page}`
+        );
+
+        if (response.artifacts.length === 0) {
+          hasMorePages = false;
+        } else {
+          allArtifacts = allArtifacts.concat(response.artifacts);
+          page++;
+          // If we got less than 100 artifacts, we're on the last page
+          if (response.artifacts.length < 100) {
+            hasMorePages = false;
+          }
+        }
+      }
+
+      return allArtifacts.map((artifact: any) => ({
         id: artifact.id,
         name: artifact.name,
         size_in_bytes: artifact.size_in_bytes,
