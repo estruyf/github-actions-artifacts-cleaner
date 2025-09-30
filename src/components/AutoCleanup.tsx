@@ -6,13 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
-  Broom, 
-  CaretDown, 
-  CaretUp, 
-  Play, 
-  Eye, 
-  Clock, 
+import {
+  Broom,
+  CaretDown,
+  CaretUp,
+  Play,
+  Eye,
+  Clock,
   Archive,
   Warning,
   CheckCircle,
@@ -33,7 +33,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
   const [isRunning, setIsRunning] = useState(false);
   const [cleanupResults, setCleanupResults] = useState<Map<string, CleanupResult> | null>(null);
   const [showResults, setShowResults] = useState(false);
-  
+
   // Store max age days setting
   const [maxAgeDays, setMaxAgeDays] = useLocalStorage<number>("cleanup-max-age-days", 30);
 
@@ -45,7 +45,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
 
     setIsRunning(true);
     setShowResults(false);
-    
+
     try {
       const config: AutoCleanupConfig = {
         enabled: true,
@@ -53,14 +53,14 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
         dryRun
       };
       const results = await api.bulkCleanupRepositories(repositories, config);
-      
+
       setCleanupResults(results);
       setShowResults(true);
-      
+
       const totalDeleted = Array.from(results.values()).reduce((sum, r) => sum + r.deletedCount, 0);
       const totalSize = Array.from(results.values()).reduce((sum, r) => sum + r.totalSizeMB, 0);
       const reposWithArtifacts = Array.from(results.values()).filter(r => r.artifacts.length > 0).length;
-      
+
       if (dryRun) {
         toast.success(
           `Preview complete: Found ${totalDeleted} deletable artifacts (${formatBytes(totalSize * 1024 * 1024)}) across ${reposWithArtifacts} repositories (expired artifacts excluded)`
@@ -81,7 +81,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
 
   const getCleanupSummary = () => {
     if (!cleanupResults) return null;
-    
+
     const totalArtifacts = Array.from(cleanupResults.values()).reduce(
       (sum, result) => sum + result.artifacts.length, 0
     );
@@ -91,17 +91,17 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
     const reposWithCleanup = Array.from(cleanupResults.values()).filter(
       result => result.artifacts.length > 0
     ).length;
-    
+
     return { totalArtifacts, totalSizeMB, reposWithCleanup };
   };
 
   const summary = getCleanupSummary();
 
   return (
-    <Card>
+    <Card className="py-0">
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+          <CardHeader className={`cursor-pointer hover:bg-muted/50 transition-colors pt-6 ${isExpanded ? "pb-3" : "pb-6"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Broom className="h-5 w-5 text-primary" />
@@ -124,7 +124,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 py-6 -mt-3">
             {/* Configuration */}
             <div className="space-y-4">
               <div className="space-y-2">
@@ -154,7 +154,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                 <Eye className="h-4 w-4 mr-2" />
                 Preview Deletable Artifacts
               </Button>
-              
+
               <Button
                 onClick={() => runCleanup(false)}
                 disabled={isRunning}
@@ -178,11 +178,11 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                   <Archive className="h-4 w-4" />
                   Cleanup Results
                 </h4>
-                
+
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {Array.from(cleanupResults.entries()).map(([repoName, result]) => {
                     if (result.artifacts.length === 0 && result.errors.length === 0) return null;
-                    
+
                     return (
                       <Card key={repoName} className="p-4">
                         <div className="flex items-center justify-between mb-2">
@@ -205,7 +205,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                             {formatBytes(result.totalSizeMB * 1024 * 1024)}
                           </span>
                         </div>
-                        
+
                         {result.artifacts.length > 0 && (
                           <div className="space-y-1">
                             {result.artifacts.slice(0, 3).map((artifact) => (
@@ -225,7 +225,7 @@ export function AutoCleanup({ api, repositories, onCleanupComplete }: AutoCleanu
                             )}
                           </div>
                         )}
-                        
+
                         {result.errors.length > 0 && (
                           <div className="mt-2 space-y-1">
                             {result.errors.map((error, idx) => (
